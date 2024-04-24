@@ -1,1 +1,3 @@
-# programa-o_web_ufam
+# programação web ufam
+
+Repositorio para atividades em sala 
