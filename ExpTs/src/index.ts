@@ -1,53 +1,41 @@
-import express, { Request, Response, NextFunction } from "express";
+import express, {Request} from 'express';
 import dotenv from "dotenv";
-import fs from "fs";
-import path from "path";
+import {engine} from "express-handlebars";
+import cookieParser from 'cookie-parser';
+import session from 'express-session';
+import {v4} from "uuid";
+import router from './router/router';
+import logger from './middlewares/logger';
 
-dotenv.config();
-
-const app = express();
-const PORT = process.env.PORT || 3333;
-const LOG_FOLDER = process.env.LOG_FOLDER || "./logs";
-const LOG_FORMAT = process.env.LOG_FORMAT || "simple";
-
-// Cria a pasta de logs, se não existir
-if (!fs.existsSync(LOG_FOLDER)) {
-  fs.mkdirSync(LOG_FOLDER, { recursive: true });
+declare module "express-session"{
+  interface SessionData{
+    uid: String
+  }
 }
 
-// Middleware para logging
-const logMiddleware = (format: string) => (req: Request, res: Response, next: NextFunction) => {
-  const logData = {
-    timestamp: new Date().toISOString(),
-    url: req.url,
-    method: req.method,
-    httpVersion: req.httpVersion,
-    userAgent: req.get("User-Agent") || ""
-  };
+dotenv.config();
+const app = express();
+const PORT = process.env.PORT ?? 4466
 
-  let logMessage: string;
-  if (format === "complete") {
-    logMessage = `${logData.timestamp} ${logData.method} ${logData.url} ${logData.httpVersion} ${logData.userAgent}`;
-  } else {
-    logMessage = `${logData.timestamp} ${logData.method} ${logData.url}`;
-  }
+app.engine("handlebars", engine({helpers: require(`${__dirname}/views/helpers/helpers.ts`)}));
+app.set("view engine", "handlebars");
+app.set("views", `${__dirname}/views`)
 
-  const logFilePath = path.join(LOG_FOLDER, `${new Date().toISOString().split('T')[0]}.log`);
-  fs.appendFile(logFilePath, logMessage + '\n', (err) => {
-    if (err) {
-      console.error("Erro ao salvar o log:", err);
-    }
-  });
+app.use(logger("combined"));
+app.use("/img", express.static(`${__dirname}/../public/img`));
+app.locals.valor = "10"
+app.use(cookieParser())
+app.use(session({
+  genid: () => v4(),
+  secret: "Ghrsoo456#",
+  saveUninitialized: true,
+  resave: true,
+  cookie: {maxAge:360000},
+}))
 
-  next();
-};
-
-app.use(logMiddleware(LOG_FORMAT));
-
-app.get("/", (req: Request, res: Response) => {
-  res.send("Hello world!");
-});
+app.use(express.urlencoded({extended: false}))
+app.use(router)
 
 app.listen(PORT, () => {
-  console.log(`Express app iniciada na porta ${PORT}.`);
-});
+  console.log(`Servidor rodando na porta ${PORT}`)
+})
